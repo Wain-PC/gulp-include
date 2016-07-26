@@ -158,10 +158,6 @@ function processInclude(content, filePath, sourceMap) {
             }
         }
 
-        if (includeCondition === 'is') {
-            debugger;
-        }
-
 
         if (sourceMap) {
             // get position of current match and get current line number
