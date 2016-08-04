@@ -209,10 +209,32 @@ module.exports = function (params) {
 
                 // Get file contents and apply recursive include on result
                 // Unicode byte order marks are stripped from the start of included files
-                var fileContents = stripBom(fs.readFileSync(globbedFilePath));
+                var fileContents = stripBom(fs.readFileSync(globbedFilePath)).toString();
 
-                //console.log("Including %s", match[0]);
-                var result = processInclude(fileContents.toString(), globbedFilePath, sourceMap);
+                //Find "///#IFDEF condition --- #ENDIF", "#IFNDEF condition --- ///#ENDIF" lines and replace content based on the condition
+                var ifdefRegExp = /\/\/\/#(IFDEF|IFNDEF) (\w+)([\w\W]*?)\/\/\/#ENDIF/gm, ifdefMatch;
+                do {
+                    ifdefMatch = ifdefRegExp.exec(fileContents);
+                    if (ifdefMatch) {
+                        //includeCondition, includePropName
+                        includeCondition = ifdefMatch[1];
+                        includePropName = ifdefMatch[2];
+
+                        if (includeCondition && includePropName) {
+                            //if the condition is 'is' and property name matches, proceed
+                            //also proceed when the condition is 'not' and property name does NOT match
+                            if (!((includeCondition === 'IFDEF' && (argv.hasOwnProperty(includePropName) || params.args.hasOwnProperty(includePropName))) ||
+                                (includeCondition === 'IFNDEF' && !(argv.hasOwnProperty(includePropName) || params.args.hasOwnProperty(includePropName))))) {
+                                //console.log("Removing code part %s (%s %s)", ifdefMatch[0], includeCondition, includePropName);
+                                fileContents = fileContents.replace(ifdefMatch[0], '');
+                                ifdefRegExp.lastIndex -= ifdefMatch[0].length;
+                            }
+                        }
+                    }
+
+                } while (ifdefMatch);
+
+                var result = processInclude(fileContents, globbedFilePath, sourceMap);
                 var resultContent = result.content;
 
                 if (sourceMap) {
